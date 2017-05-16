@@ -138,7 +138,8 @@ function! Tex_CompileLatex()
 			let mainfname = fnamemodify(mainfname, ':r')
 		endif
 		call Tex_Debug('Tex_CompileLatex: execing [make! '.mainfname.']', 'comp')
-		exec 'make! '.mainfname
+		"exec 'make! '.mainfname
+		exec 'silent! :Make ' . mainfname
 	endif
 	redraw!
 
@@ -559,78 +560,79 @@ function! Tex_CompileMultipleTimes()
 
 	let runCount = 0
 	let needToRerun = 1
-	while needToRerun == 1 && runCount < 5
-		" assume we need to run only once.
-		let needToRerun = 0
+	silent! call Tex_CompileLatex()
+	"while needToRerun == 1 && runCount < 5
+	"	" assume we need to run only once.
+	"	let needToRerun = 0
 
-		let idxlinesBefore = Tex_CatFile(idxFileName)
-		let auxlinesBefore = Tex_GetAuxFile(auxFileName)
+	"	let idxlinesBefore = Tex_CatFile(idxFileName)
+	"	let auxlinesBefore = Tex_GetAuxFile(auxFileName)
 
-		" first run latex.
-		echomsg "latex run number : ".(runCount+1)
-		call Tex_Debug("Tex_CompileMultipleTimes: latex run number : ".(runCount+1), "comp")
-		silent! call Tex_CompileLatex()
+	"	" first run latex.
+	"	echomsg "latex run number : ".(runCount+1)
+	"	call Tex_Debug("Tex_CompileMultipleTimes: latex run number : ".(runCount+1), "comp")
+	"	silent! call Tex_CompileLatex()
 
-		" If there are errors in any latex compilation step, immediately
-		" return. For now, do not bother with warnings because those might go
-		" away after compiling again or after bibtex is run etc.
-		let errlist = Tex_GetErrorList()
-		call Tex_Debug("Tex_CompileMultipleTimes: errors = [".errlist."]", "comp")
+	"	 If there are errors in any latex compilation step, immediately
+	"	 return. For now, do not bother with warnings because those might go
+	"	 away after compiling again or after bibtex is run etc.
+	"	let errlist = Tex_GetErrorList()
+	"	call Tex_Debug("Tex_CompileMultipleTimes: errors = [".errlist."]", "comp")
 
-		if errlist =~ 'error'
-			let g:Tex_IgnoredWarnings = origpats
-			exec 'TCLevel '.origlevel
+	"	if errlist =~ 'error'
+	"		let g:Tex_IgnoredWarnings = origpats
+	"		exec 'TCLevel '.origlevel
 
-			return
-		endif
+	"		return
+	"	endif
 
-		let idxlinesAfter = Tex_CatFile(idxFileName)
+	"	let idxlinesAfter = Tex_CatFile(idxFileName)
 
-		" If .idx file changed, then run makeindex to generate the new .ind
-		" file and remember to rerun latex.
-		if runCount == 0 && glob(idxFileName) != '' && idxlinesBefore != idxlinesAfter
-			echomsg "Running makeindex..."
-			let temp_mp = &mp | let &mp = Tex_GetVarValue('Tex_MakeIndexFlavor')
-			exec 'silent! make '.mainFileName_root
-			let &mp = temp_mp
+	"	" If .idx file changed, then run makeindex to generate the new .ind
+	"	" file and remember to rerun latex.
+	"	if runCount == 0 && glob(idxFileName) != '' && idxlinesBefore != idxlinesAfter
+	"		echomsg "Running makeindex..."
+	"		let temp_mp = &mp | let &mp = Tex_GetVarValue('Tex_MakeIndexFlavor')
+	"		exec 'silent! make '.mainFileName_root
+	"		let &mp = temp_mp
 
-			let needToRerun = 1
-		endif
+	"		let needToRerun = 1
+	"	endif
 
-		" The first time we see if we need to generate the bibliography and if the .bbl file
-		" changes, we will rerun latex.
-		" We use '\\bibdata' as a check for BibTeX and '\\abx' as a check for biber.
-		if runCount == 0 && Tex_IsPresentInFile('\\bibdata|\\abx', mainFileName_root.'.aux')
-			let bibFileName = mainFileName_root.'.bbl'
+	"	" The first time we see if we need to generate the bibliography and if the .bbl file
+	"	" changes, we will rerun latex.
+	"	" We use '\\bibdata' as a check for BibTeX and '\\abx' as a check for biber.
+	"	if runCount == 0 && Tex_IsPresentInFile('\\bibdata|\\abx', mainFileName_root.'.aux')
+	"		let bibFileName = mainFileName_root.'.bbl'
 
-			let biblinesBefore = Tex_CatFile(bibFileName)
+	"		let biblinesBefore = Tex_CatFile(bibFileName)
 
-			echomsg "Running '".Tex_GetVarValue('Tex_BibtexFlavor')."' ..."
-			let temp_mp = &mp | let &mp = Tex_GetVarValue('Tex_BibtexFlavor')
-			exec 'silent! make '.mainFileName_root
-			let &mp = temp_mp
+	"		echomsg "Running '".Tex_GetVarValue('Tex_BibtexFlavor')."' ..."
+	"		let temp_mp = &mp | let &mp = Tex_GetVarValue('Tex_BibtexFlavor')
+	"		exec 'silent! make '.mainFileName_root
+	"		let &mp = temp_mp
 
-			let biblinesAfter = Tex_CatFile(bibFileName)
+	"		let biblinesAfter = Tex_CatFile(bibFileName)
 
-			" If the .bbl file changed after running bibtex, we need to
-			" latex again.
-			if biblinesAfter != biblinesBefore
-				echomsg 'Need to rerun because bibliography file changed...'
-				call Tex_Debug('Tex_CompileMultipleTimes: Need to rerun because bibliography file changed...', 'comp')
-				let needToRerun = 1
-			endif
-		endif
+	"		" If the .bbl file changed after running bibtex, we need to
+	"		" latex again.
+	"		if biblinesAfter != biblinesBefore
+	"			echomsg 'Need to rerun because bibliography file changed...'
+	"			call Tex_Debug('Tex_CompileMultipleTimes: Need to rerun because bibliography file changed...', 'comp')
+	"			let needToRerun = 1
+	"		endif
+	"	endif
 
-		" check if latex asks us to rerun
-		let auxlinesAfter = Tex_GetAuxFile(auxFileName)
-		if auxlinesAfter != auxlinesBefore
-			echomsg "Need to rerun because the AUX file changed..."
-			call Tex_Debug("Tex_CompileMultipleTimes: Need to rerun to get cross-references right...", 'comp')
-			let needToRerun = 1
-		endif
+	"	" check if latex asks us to rerun
+	"	let auxlinesAfter = Tex_GetAuxFile(auxFileName)
+	"	if auxlinesAfter != auxlinesBefore
+	"		echomsg "Need to rerun because the AUX file changed..."
+	"		call Tex_Debug("Tex_CompileMultipleTimes: Need to rerun to get cross-references right...", 'comp')
+	"		let needToRerun = 1
+	"	endif
 
-		let runCount = runCount + 1
-	endwhile
+	"	let runCount = runCount + 1
+	"endwhile
 
 	redraw!
 	call Tex_Debug("Tex_CompileMultipleTimes: Ran latex ".runCount." time(s)", "comp")
